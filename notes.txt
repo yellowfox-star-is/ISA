@@ -1,0 +1,8 @@
+Argument parsing taken from: http://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
+                             http://www.gnu.org/software/libc/manual/html_node/Getopt.html
+
+Macros inspired by: https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
+
+BIT operations inspired by: https://www.geeksforgeeks.org/set-clear-and-toggle-a-given-bit-of-a-number-in-c/
+
+Access function inspired by: https://www.ibm.com/docs/en/zos/2.2.0?topic=functions-access-determine-whether-file-can-be-accessed
