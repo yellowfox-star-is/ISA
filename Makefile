@@ -1,4 +1,4 @@
-CFLAGS = -std=c99 -pedantic -Wall -Wextra
+CFLAGS = -pedantic -Wall -Wextra
 
 debug: CFLAGS += -g
 debug: rebuild
