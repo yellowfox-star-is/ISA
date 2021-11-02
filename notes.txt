@@ -6,3 +6,9 @@ Macros inspired by: https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
 BIT operations inspired by: https://www.geeksforgeeks.org/set-clear-and-toggle-a-given-bit-of-a-number-in-c/
 
 Access function inspired by: https://www.ibm.com/docs/en/zos/2.2.0?topic=functions-access-determine-whether-file-can-be-accessed
+
+GETADDRINFO inspired by: https://man7.org/linux/man-pages/man3/getaddrinfo.3.html
+
+Doesn't need to be mentioned: Error codes understood from: https://stackoverflow.com/questions/4395919/linux-system-call-getaddrinfo-return-2
+
+
