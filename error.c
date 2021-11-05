@@ -15,9 +15,17 @@
 
 #define ERR_OUT stderr
 
+void printf_error(const char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    vfprintf(ERR_OUT, fmt, args);
+    va_end(args);
+}
+
 void warning_msg(const char *fmt, ...)
 {
-
     va_list args;
 
     va_start(args, fmt);
@@ -28,7 +36,6 @@ void warning_msg(const char *fmt, ...)
 
 void error_exit(int exit_code, const char *fmt, ...)
 {
-
     va_list args;
 
     va_start(args, fmt);

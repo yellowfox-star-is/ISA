@@ -10,7 +10,8 @@
             "name": "Debug",
             "preLaunchTask": "make_debug",
             "program": "${workspaceFolder}/secret",
-            "args": ["-r", "h2g2.txt", "-v"],
+            "args": ["-r", "h2g2.txt", "-s", "google.com", "-v"],
+            //"args": [],
             "cwd": "${workspaceFolder}"
         }
     ]
