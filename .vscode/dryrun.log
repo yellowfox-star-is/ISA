@@ -1,7 +1,0 @@
-make all --dry-run --always-make --keep-going --print-directory
-make: Entering directory '/home/yellowfox/deep_storage/vysoká/ISA/proj'
-gcc -std=c99 -pedantic -Wall -Wextra -c secret.c -o secret.o
-gcc -std=c99 -pedantic -Wall -Wextra -c error.c -o error.o
-gcc -std=c99 -pedantic -Wall -Wextra secret.o error.o -o secret
-make: Leaving directory '/home/yellowfox/deep_storage/vysoká/ISA/proj'
- 

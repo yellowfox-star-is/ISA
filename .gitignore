@@ -1,0 +1,8 @@
+#ignore binaries
+*.o
+
+#ignore build program
+secret
+
+#ignore vscode
+.vscode
