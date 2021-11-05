@@ -4,18 +4,16 @@
 //varianta: skrytý kanál
 
 //POSIX headers
-#include <unistd.h>
-#include <getopt.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
-
-//Network libraries
 
 //custom headers
 #include "error.h"
 #include "bit.h"
 #include "arguments.h"
+
+#include "client.h"
+//#include "server.h"
 
 int main (int argc, char* argv[])
 {
@@ -26,6 +24,14 @@ int main (int argc, char* argv[])
 
     read_arguments(argc, argv, &filename, &hostname, &isServer, &isVerbose);
     verify_arguments(argv, filename, hostname, isServer, isVerbose);
+    if (isServer)
+    {
+        //start_server(isVerbose);
+    }
+    else
+    {
+        //start_client(filename, hostname, isVerbose);
+    }
 
     return 0;
 }

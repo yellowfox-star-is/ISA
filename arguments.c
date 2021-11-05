@@ -9,10 +9,8 @@
 #include "error.h"
 #include "bit.h"
 #include "networking.h"
-
 #include "arguments.h"
-
-#define CHAR_LIMIT 100
+#include "smrcka_bat.h"
 
 int read_arguments(int argc, char* argv[], char **filename, char **hostname, bool *isServer, bool *isVerbose)
 {
@@ -72,9 +70,9 @@ int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer
     {
         printf("Usage:\n");
         printf("%s -r <file> -s <ip|hostname> [-l]\n", argv[0]);
-        printf("-r <file> : name of file to be transmitted\n");
-        printf("-s <ip|address : ip address/hostname of server\n");
-        printf("-l : program will start in a server mode\n");
+        printf("%s-r <file> : name of file to be transmitted\n", indent);
+        printf("%s-s <ip|address : ip address/hostname of server\n", indent);
+        printf("%s-l : program will start in a server mode\n", indent);
         exit(0);
     }
 
@@ -82,10 +80,10 @@ int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer
     {
         printf("The program was started in a verbose mode. Prepare, that it will be unnecesarily chatty.\n");
         printf("Recieved arguments:\n");
-        printf("    filename: %s\n", filename);
-        printf("    hostname: %s\n", hostname);
-        printf("    isServer: %s\n", BOOL2STRING(isServer));
-        printf("    isVerbose: %s\n", BOOL2STRING(isVerbose));
+        printf("%sfilename: %s\n",indent, filename);
+        printf("%shostname: %s\n",indent, hostname);
+        printf("%sisServer: %s\n",indent, BOOL2STRING(isServer));
+        printf("%sisVerbose: %s\n",indent, BOOL2STRING(isVerbose));
     }
 
     if (isServer)

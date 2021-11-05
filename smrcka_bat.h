@@ -1,0 +1,19 @@
+#ifndef SMRCKA_BAT_H
+#define SMRCKA_BAT_H
+
+//contains global constants and macros
+
+#define CHAR_LIMIT 100
+const char indent[5] = "    ";
+
+#endif //SMRCKA_BAT_H
+
+#if 0
+name of this file is rather confusing, so I will explain
+In the time of writing of this file, Ing. Aleš Smrčka Ph.D. was teacher one of my lectures that I had the privilege to attend during my studies on VUT FIT in Brno.
+He adviced us to always contain "magical numbers" in some constants or macros or other definitions and use those instead, for better readability of the code
+and for easier editation later on. He also told us and now I will be paraphrasing. To always imagine him standing behind us with a baseball bat
+if we were to write a magical number into a code. I contemplated for many hours how to name a file which would contain such constants and thus I concluded
+that I will name it in his honor and in honor of emoji that was created on school discord server.
+:smrckaBat:
+#endif
