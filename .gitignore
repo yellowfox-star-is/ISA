@@ -6,3 +6,4 @@ secret
 
 #ignore vscode
 .vscode
+workspace.code-workspace

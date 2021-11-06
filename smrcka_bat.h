@@ -4,7 +4,10 @@
 //contains global constants and macros
 
 #define CHAR_LIMIT 100
-const char indent[5] = "    ";
+extern const char indent[5];
+#define MAX_PACKET_LENGTH 1500
+#define MAX_DATA_LENGTH 1000
+#define MAX_ENCRYPTED_DATA_LENGTH 1300
 
 #endif //SMRCKA_BAT_H
 

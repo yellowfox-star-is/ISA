@@ -30,7 +30,7 @@ int main (int argc, char* argv[])
     }
     else
     {
-        //start_client(filename, hostname, isVerbose);
+        start_client(filename, hostname, isVerbose);
     }
 
     return 0;
