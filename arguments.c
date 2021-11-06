@@ -168,18 +168,12 @@ int verify_filename(char *filename, bool isVerbose)
 int verify_hostname(char *hostname, bool isVerbose)
 {
     int result = 0;
-
-    struct addrinfo hints; //prepares structs for function getaddrinfo
-    struct addrinfo *serverinfo;
-    //replaces all bytes in struct hints with zeroes
-    //it is from strings.h but it works nicely in this situation
-    memset(&hints, 0, sizeof(hints)); 
     int getadd_result = 0;
 
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_RAW;
+    struct addrinfo hints; //prepares structs for function get_address_info
+    struct addrinfo *serverinfo;
 
-    getadd_result = getaddrinfo(hostname, NULL, &hints, &serverinfo);
+    getadd_result = get_address_info(&hints, &serverinfo, hostname);
 
     if (getadd_result != 0)
     {

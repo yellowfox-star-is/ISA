@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netdb.h>
 
 #include "error.h"
 #include "smrcka_bat.h"
@@ -8,12 +9,6 @@
 #include "networking.h"
 
 enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, SEND_LAST_PACKET, WAIT_FOR_FINISH, END, EXIT};
-
-int initialize_socket(char *hostname)
-{
-    //dummy socket
-    return 0;
-}
 
 int close_socket()
 {
@@ -45,14 +40,18 @@ int start_client(char *filename, char *hostname, bool isVerbose)
     FILE *file_input = NULL;
     int result = 0;
     int copied_length = 0;
+    struct addrinfo hints;
+    struct addrinfo *serverinfo;
+    int socket = 0;
 
     while (state != EXIT)
     {
         switch (state)
         {
             case START:
-                result = initialize_socket(hostname);
-                if (result)
+                result = get_address_info(&hints, &serverinfo, hostname);
+                socket = initialize_socket(serverinfo);
+                if (socket == -1)
                 {
                     result = 1;
                     error_exit(1, "Program wasn't able to open a socket.\n");

@@ -33,6 +33,22 @@ void *get_addr(struct sockaddr *sa)
     return NULL;
 }
 
+int initialize_socket(struct addrinfo *serverinfo)
+{
+    int protocol = serverinfo->ai_family == AF_INET ? IPPROTO_ICMP : IPPROTO_ICMPV6;
+	return socket(serverinfo->ai_family, serverinfo->ai_socktype, protocol);
+}
+
+int get_address_info(struct addrinfo *hints, struct addrinfo **serverinfo, char *hostname)
+{
+    //replaces all bytes in struct hints with zeroes
+    //it is from strings.h but it works nicely in this situation
+    memset(hints, 0, sizeof(*hints));
+    hints->ai_family = AF_UNSPEC;
+    hints->ai_socktype = SOCK_RAW;
+    return getaddrinfo(hostname, NULL, hints, serverinfo);
+}
+
 int send_data(int socket, const struct addrinfo *serverinfo, const char *fmt, ...)
 {
     //variables initialization
@@ -41,6 +57,7 @@ int send_data(int socket, const struct addrinfo *serverinfo, const char *fmt, ..
     char encrypted_data[MAX_ENCRYPTED_DATA_LENGTH];
     int data_length = 0;
     int encrypted_data_length = 0;
+    
 
     //data preparation
     va_list args;
