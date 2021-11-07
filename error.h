@@ -14,5 +14,6 @@
 void warning_msg(const char *fmt, ...);
 void error_exit(int exit_code, const char *fmt, ...);
 void printf_error(const char *fmt, ...);
+#define ERR_OUT stderr
 
 #endif //ERROR_H

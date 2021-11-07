@@ -1,3 +1,4 @@
+#include <openssl/asn1.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 #include "client.h"
 #include "networking.h"
 
-enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, SEND_LAST_PACKET, WAIT_FOR_FINISH, END, EXIT};
+enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, REPEAT_DATA, END, WAIT_FOR_FINISH, EXIT};
 
 int close_socket()
 {
@@ -33,6 +34,21 @@ int initialize_file(char *filename, FILE **file_input)
     return 0;
 }
 
+int fill_buffer(FILE *file_input, unsigned char buffer[])
+{
+    int c;
+    int i = 0;
+
+    while ((i < MAX_DATA_LENGTH) && (c = fgetc(file_input)) != EOF)
+    {
+        buffer[i] = (char) c;
+        i++;
+    }
+
+    //TODO WARNING maybe needed to put /0 on end
+    return c == EOF ? i * -1 : i;
+}
+
 int start_client(char *filename, char *hostname, bool isVerbose)
 {
 
@@ -43,6 +59,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
     struct addrinfo hints;
     struct addrinfo *serverinfo;
     int socket = 0;
+    unsigned char buffer[MAX_DATA_LENGTH];
 
     while (state != EXIT)
     {
@@ -60,7 +77,6 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 if (file_input == NULL)
                 {
                     result = 1;
-                    close_socket();
                     error_exit(1, "Program wasn't able to open a file.\n");
                 }
                 state = SEND_HEADER;
@@ -73,18 +89,59 @@ int start_client(char *filename, char *hostname, bool isVerbose)
 
             case WAIT_FOR_HEADER:
                 //dummy accept
-                state = SEND_DATA;
+                if (0)
+                {
+                    state = SEND_HEADER;
+                }
+                else
+                {
+                    state = SEND_DATA;
+                }
             break;
 
             case SEND_DATA:
-                //send_data();
-                state = END;
-                //state = WAIT_FOR_ACCEPT;
+                copied_length = fill_buffer(file_input, buffer);
+                __attribute__ ((fallthrough));
+            case REPEAT_DATA:
+                if (copied_length <= 0)
+                {
+                    state = END;
+                    break;
+                }
+                send_data(socket, serverinfo, "SECRET\n%s", buffer);
+                state = WAIT_FOR_ACCEPT;
+            break;
+
+            case WAIT_FOR_ACCEPT:
+                if (0)
+                {
+                    state = REPEAT_DATA;
+                }
+                else
+                {
+                    state = SEND_DATA;
+                }
             break;
 
             case END:
+                send_data(socket, serverinfo, "SECRET\n%s\nSECRET_END\n", buffer);
+                state = WAIT_FOR_FINISH;
+            break;
+
+            case WAIT_FOR_FINISH:
+                //dummy wait
+                if (0)
+                {
+                    state = END;
+                }
+                else
+                {
+                    state = EXIT;
+                }
+            break;
+
+            case EXIT:
                 fclose(file_input);
-                close_socket();
                 state = EXIT;
             break;
         }

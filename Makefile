@@ -15,7 +15,7 @@ tar:
 	tar -cvf xsysel09.tar *.c *.h secret.1 manual.pdf Makefile
 
 secret: secret.o error.o error.h bit.h arguments.o arguments.h networking.o networking.h client.h client.o smrcka_bat.o
-	gcc $(CFLAGS) secret.o error.o arguments.o networking.o smrcka_bat.o client.o -o secret
+	gcc $(CFLAGS) secret.o error.o arguments.o networking.o smrcka_bat.o client.o -o secret -lcrypto
 
 secret.o: secret.c error.h bit.h networking.h arguments.h
 	gcc $(CFLAGS) -c secret.c -o secret.o

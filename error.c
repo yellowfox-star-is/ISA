@@ -13,8 +13,6 @@
 #include <string.h>
 #include "error.h"
 
-#define ERR_OUT stderr
-
 void printf_error(const char *fmt, ...)
 {
     va_list args;
