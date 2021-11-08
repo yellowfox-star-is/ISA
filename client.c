@@ -3,13 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
+#include <string.h>
 
 #include "error.h"
 #include "smrcka_bat.h"
 #include "client.h"
 #include "networking.h"
 
-enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, REPEAT_DATA, END, WAIT_FOR_FINISH, EXIT};
+enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, REPEAT_DATA, END, REPEAT_END, WAIT_FOR_FINISH, FREE, EXIT};
 
 int close_socket()
 {
@@ -39,7 +40,7 @@ int fill_buffer(FILE *file_input, unsigned char buffer[])
     int c;
     int i = 0;
 
-    while ((i < MAX_DATA_LENGTH) && (c = fgetc(file_input)) != EOF)
+    while ((i < FILE_CHUNK) && (c = fgetc(file_input)) != EOF)
     {
         buffer[i] = (char) c;
         i++;
@@ -51,15 +52,16 @@ int fill_buffer(FILE *file_input, unsigned char buffer[])
 
 int start_client(char *filename, char *hostname, bool isVerbose)
 {
-
     enum client_state state = START;
     FILE *file_input = NULL;
     int result = 0;
-    int copied_length = 0;
+    int buffer_length = 0;
     struct addrinfo hints;
     struct addrinfo *serverinfo;
     int socket = 0;
     unsigned char buffer[MAX_DATA_LENGTH];
+    unsigned char data[MAX_DATA_LENGTH];
+    int data_length = 0;
 
     while (state != EXIT)
     {
@@ -83,12 +85,14 @@ int start_client(char *filename, char *hostname, bool isVerbose)
             break;
 
             case SEND_HEADER:
-                send_data(socket, serverinfo, "START_SECRET\n%s\n", hostname);
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "START_SECRET\n%s\n", filename);
+                send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_HEADER;
             break;
 
             case WAIT_FOR_HEADER:
                 //dummy accept
+                data_length = 0;
                 if (0)
                 {
                     state = SEND_HEADER;
@@ -100,15 +104,19 @@ int start_client(char *filename, char *hostname, bool isVerbose)
             break;
 
             case SEND_DATA:
-                copied_length = fill_buffer(file_input, buffer);
-                __attribute__ ((fallthrough));
-            case REPEAT_DATA:
-                if (copied_length <= 0)
+                buffer_length = fill_buffer(file_input, buffer);
+                if (buffer_length <= 0)
                 {
+                    buffer_length = abs(buffer_length);
                     state = END;
                     break;
                 }
-                send_data(socket, serverinfo, "SECRET\n%s", buffer);
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET\n%d\n", buffer_length);
+                memcpy(data + data_length, buffer, buffer_length);
+                data_length += buffer_length;
+                __attribute__ ((fallthrough));
+            case REPEAT_DATA:
+                send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_ACCEPT;
             break;
 
@@ -119,12 +127,18 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 }
                 else
                 {
+                    data_length = 0;
                     state = SEND_DATA;
                 }
             break;
 
             case END:
-                send_data(socket, serverinfo, "SECRET\n%s\nSECRET_END\n", buffer);
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_END\n%d\n", buffer_length);
+                memcpy(data + data_length, buffer, buffer_length);
+                data_length += buffer_length;
+                __attribute__ ((fallthrough));
+            case REPEAT_END:
+                send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_FINISH;
             break;
 
@@ -137,12 +151,20 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 else
                 {
                     state = EXIT;
+                    data_length = 0;
                 }
             break;
 
-            case EXIT:
+            case FREE:
                 fclose(file_input);
                 state = EXIT;
+            break;
+
+            default:
+                warning_msg("Implementation error. Client got into unrecognized state.\n");
+                warning_msg("Please contact author.\n");
+                result = 1;
+                state = FREE;
             break;
         }
     }

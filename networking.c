@@ -103,21 +103,20 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *cipherte
     return ciphertext_len;
 }
 
-int send_data(int socket, const struct addrinfo *serverinfo, const char *fmt, ...)
+int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data, int data_length)
 {
     //variables initialization
     unsigned char packet[MAX_PACKET_LENGTH];
-    unsigned char data[MAX_DATA_LENGTH];
     unsigned char encrypted_data[MAX_ENCRYPTED_DATA_LENGTH];
-    int data_length = 0;
     int encrypted_data_length = 0;
     
-
+    #if 0
     //data preparation
     va_list args;
     va_start(args, fmt);
     data_length = snprintf((char *)data, MAX_DATA_LENGTH, fmt, args);
     va_end(args);
+    #endif
 
     if (data_length < 0 || data_length >= MAX_DATA_LENGTH)
     {

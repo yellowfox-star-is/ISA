@@ -7,6 +7,7 @@
 extern const char indent[5];
 extern const unsigned char key_128[17];
 #define MAX_PACKET_LENGTH 1500
+#define FILE_CHUNK 900
 #define MAX_DATA_LENGTH 1000
 #define MAX_ENCRYPTED_DATA_LENGTH 1300
 
