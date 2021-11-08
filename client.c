@@ -85,6 +85,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
             break;
 
             case SEND_HEADER:
+                //TODO CRITICAL send only filename and not path
                 data_length += snprintf((char *)data, MAX_DATA_LENGTH, "START_SECRET\n%s\n", filename);
                 send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_HEADER;

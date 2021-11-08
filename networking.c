@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -11,6 +12,26 @@
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
+
+//TODO Verify, is following can be used
+#include <pcap.h>
+#include <pcap/pcap.h>
+#include <errno.h>
+#define __FAVOR_BSD          // important for tcphdr structure
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+#include <arpa/inet.h>
+#include <netinet/if_ether.h> 
+#include <err.h>
+
+#ifdef __linux__            // for Linux
+#include <netinet/ether.h> 
+#include <time.h>
+#include <pcap/pcap.h>
+#endif
+//TODO End
 
 #include "error.h"
 #include "networking.h"
@@ -155,4 +176,72 @@ int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data,
     }
 
     return 0;
+}
+
+void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
+{
+  struct ip *my_ip;               // pointer to the beginning of IP header
+  struct ether_header *eptr;      // pointer to the beginning of Ethernet header
+  const struct tcphdr *my_tcp;    // pointer to the beginning of TCP header
+  const struct udphdr *my_udp;    // pointer to the beginning of UDP header
+  u_int size_ip;
+}
+
+/*==========================================================================
+* Following Code taken from ISA examples
+* (c) Petr Matousek, 2020
+*///========================================================================
+int liten_for_packet(bool isVerbose){
+  char errbuf[PCAP_ERRBUF_SIZE];  // constant defined in pcap.h
+  pcap_t *handle;                 // packet capture handle 
+  pcap_if_t *alldev, *dev ;       // a list of all input devices
+  char *devname;                  // a name of the device
+  struct in_addr a,b;
+  bpf_u_int32 netaddr;            // network address configured at the input device
+  bpf_u_int32 mask;               // network mask of the input device
+  struct bpf_program fp;          // the compiled filter
+
+  // open the input devices (interfaces) to sniff data
+  if (pcap_findalldevs(&alldev, errbuf))
+    err(1,"Can't open input device(s)");
+
+  // list the available input devices
+  printf("Available input devices are: ");
+  for (dev = alldev; dev != NULL; dev = dev->next){
+    printf("%s ",dev->name);
+  }
+  printf("\n");
+
+  devname = alldev->name;  // select the name of first interface (default) for sniffing 
+  
+  // get IP address and mask of the sniffing interface
+  if (pcap_lookupnet(devname,&netaddr,&mask,errbuf) == -1)
+    err(1,"pcap_lookupnet() failed");
+
+  a.s_addr=netaddr;
+  printf("Opening interface \"%s\" with net address %s,",devname,inet_ntoa(a));
+  b.s_addr=mask;
+  printf("mask %s for listening...\n",inet_ntoa(b));
+
+  // open the interface for live sniffing
+  if ((handle = pcap_open_live(devname,BUFSIZ,1,1000,errbuf)) == NULL)
+    err(1,"pcap_open_live() failed");
+
+  // compile the filter
+  if (pcap_compile(handle,&fp,"icmp or icmp6",0,netaddr) == -1)
+    err(1,"pcap_compile() failed");
+  
+  // set the filter to the packet capture handle
+  if (pcap_setfilter(handle,&fp) == -1)
+    err(1,"pcap_setfilter() failed");
+
+  // read packets from the interface in the infinite loop (count == -1)
+  // incoming packets are processed by function mypcap_handler() 
+  if (pcap_loop(handle,-1,mypcap_handler,NULL) == -1)
+    err(1,"pcap_loop() failed");
+
+  // close the capture device and deallocate resources
+  pcap_close(handle);
+  pcap_freealldevs(alldev);
+  return 0;
 }

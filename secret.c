@@ -13,7 +13,7 @@
 #include "arguments.h"
 
 #include "client.h"
-//#include "server.h"
+#include "server.h"
 
 int main (int argc, char* argv[])
 {
@@ -26,7 +26,7 @@ int main (int argc, char* argv[])
     verify_arguments(argv, filename, hostname, isServer, isVerbose);
     if (isServer)
     {
-        //start_server(isVerbose);
+        start_server(isVerbose);
     }
     else
     {
