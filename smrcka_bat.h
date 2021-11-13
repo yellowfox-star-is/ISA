@@ -1,6 +1,7 @@
 #ifndef SMRCKA_BAT_H
 #define SMRCKA_BAT_H
 
+#include <stdbool.h>
 //contains global constants and macros
 
 #define CHAR_LIMIT 100
@@ -12,6 +13,7 @@ extern const unsigned char key_128[17];
 #define MAX_ENCRYPTED_DATA_LENGTH 1300
 enum secret_protocol {SECRET_START, SECRET_DATA, SECRET_END, SECRET_ACCEPT, SECRET_REPEAT, SECRET_CORRUPTED};
 #define ALLOWED_CORRUPTION 2
+extern bool replace_file;
 
 #endif //SMRCKA_BAT_H
 

@@ -53,7 +53,7 @@
 #define DROP_HEADER(prev_hdr, size) (((unsigned char *)prev_hdr) + size)
 
 //variables accesible for packet catching
-bool was_packet_caught = false;
+bool packet_was_caught = false;
 enum secret_protocol recognized_protocol;
 char ip_src[CHAR_LIMIT];
 char decrypted_packet[MAX_PACKET_LENGTH];
@@ -210,7 +210,7 @@ int string_cmp_n(char *str1, const char *str2, int length)
     return result;
 }
 
-int is_secret(char* data, int length)
+int is_secret(char* data)
 {
     const char s[] = "SECRET";
     const int s_len = strlen(s);
@@ -301,10 +301,10 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
 
   if (possibly_caught)
   {
-      secret_protocol = is_secret((char *)data, data_size);
+      secret_protocol = is_secret((char *)data);
       if (secret_protocol > 0) //recognized a secret protocol
       {
-          was_packet_caught = true;
+          packet_was_caught = true;
           recognized_protocol = secret_protocol;
           strcpy(ip_src, inet_ntoa(my_ip->ip_src));
           if (secret_protocol != SECRET_CORRUPTED)
