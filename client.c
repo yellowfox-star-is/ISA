@@ -86,7 +86,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
 
             case SEND_HEADER:
                 //TODO CRITICAL send only filename and not path
-                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "START_SECRET\n%s\n", filename);
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_START\n%s\n", filename);
                 send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_HEADER;
             break;
@@ -112,7 +112,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                     state = END;
                     break;
                 }
-                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET\n%d\n", buffer_length);
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_DATA\n%d\n", buffer_length);
                 memcpy(data + data_length, buffer, buffer_length);
                 data_length += buffer_length;
                 __attribute__ ((fallthrough));
