@@ -12,12 +12,6 @@
 
 enum client_state {START, SEND_HEADER, WAIT_FOR_HEADER, SEND_DATA, WAIT_FOR_ACCEPT, REPEAT_DATA, END, REPEAT_END, WAIT_FOR_FINISH, FREE, EXIT};
 
-int close_socket()
-{
-    //dummy socket
-    return 0;
-}
-
 int initialize_file(char *filename, FILE **file_input)
 {
     if (filename == NULL)
@@ -92,16 +86,24 @@ int start_client(char *filename, char *hostname, bool isVerbose)
             break;
 
             case WAIT_FOR_HEADER:
-                //dummy accept
-                data_length = 0;
-                if (0)
+            case WAIT_FOR_ACCEPT:
+            case WAIT_FOR_FINISH:
+                listen_for_packet(isVerbose);
+                if (packet_was_caught) //maybe add IP check
                 {
-                    state = SEND_HEADER;
+                    if (recognized_protocol == SECRET_REPEAT)
+                    {
+                        //if repeat is received, function will fall through and return to repeat state
+                    }
+                    else if (recognized_protocol == SECRET_ACCEPT)
+                    {
+                        data_length = 0;
+                        state = state == END ? EXIT : SEND_DATA;
+                    }
                 }
-                else
-                {
-                    state = SEND_DATA;
-                }
+                if (state == WAIT_FOR_HEADER) state = SEND_HEADER;
+                if (state == WAIT_FOR_ACCEPT) state = REPEAT_DATA;
+                if (state == WAIT_FOR_FINISH) state = REPEAT_END;
             break;
 
             case SEND_DATA:
@@ -121,6 +123,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 state = WAIT_FOR_ACCEPT;
             break;
 
+/*
             case WAIT_FOR_ACCEPT:
                 if (0)
                 {
@@ -133,16 +136,6 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 }
             break;
 
-            case END:
-                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_END\n%d\n", buffer_length);
-                memcpy(data + data_length, buffer, buffer_length);
-                data_length += buffer_length;
-                __attribute__ ((fallthrough));
-            case REPEAT_END:
-                send_data(socket, serverinfo, data, data_length);
-                state = WAIT_FOR_FINISH;
-            break;
-
             case WAIT_FOR_FINISH:
                 //dummy wait
                 if (0)
@@ -153,7 +146,16 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                 {
                     state = EXIT;
                     data_length = 0;
-                }
+                }*/
+
+            case END:
+                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_END\n%d\n", buffer_length);
+                memcpy(data + data_length, buffer, buffer_length);
+                data_length += buffer_length;
+                __attribute__ ((fallthrough));
+            case REPEAT_END:
+                send_data(socket, serverinfo, data, data_length);
+                state = WAIT_FOR_FINISH;
             break;
 
             case FREE:

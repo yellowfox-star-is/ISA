@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <signal.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -51,6 +53,8 @@
 #define SIZE_ICMPV6 (sizeof(struct icmp6_hdr))
 
 #define DROP_HEADER(prev_hdr, size) (((unsigned char *)prev_hdr) + size)
+
+pcap_t *handle;                 // packet capture handle 
 
 //variables accesible for packet catching
 bool packet_was_caught = false;
@@ -146,6 +150,24 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *cipherte
     return ciphertext_len;
 }
 
+unsigned short checksum(unsigned short *buffer, int size)
+{
+	unsigned long cksum = 0;
+ 
+	while (size > 1)
+	{
+		cksum += *buffer++;
+		size -= sizeof(unsigned short);
+	}
+	if (size)
+	{
+		cksum += *(unsigned char*)buffer;
+	}
+	cksum = (cksum >> 16) + (cksum & 0xffff);
+	cksum += (cksum >> 16);
+	return (unsigned short)(~cksum);
+}
+
 int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data, int data_length)
 {
     //variables initialization
@@ -185,11 +207,12 @@ int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data,
     //packet preparation
     memset(&packet, 0, 1500);
     struct icmphdr *icmp_header = (struct icmphdr *)packet;
-    icmp_header->code = ICMP_ECHO;
-    icmp_header->checksum = 0;
-    //TODO ADD CHECKSUM CALCULATION
+    icmp_header->type = ICMP_ECHO;
 
     memcpy(packet + sizeof(struct icmphdr), data, data_length);
+
+    //TODO ADD CHECKSUM CALCULATION
+    icmp_header->checksum = checksum((unsigned short *)icmp_header, sizeof(struct icmphdr) + data_length);
 
     if (sendto(socket, packet, sizeof(struct icmphdr) + data_length, 0, (struct sockaddr *)(serverinfo->ai_addr), serverinfo->ai_addrlen) < 0)
     {
@@ -203,7 +226,7 @@ int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data,
 int string_cmp_n(char *str1, const char *str2, int length)
 {
     int result = 0;
-    for (int i = 0; i <= length; i++)
+    for (int i = 0; i < length; i++)
     {
         result += str1[i] == str2[i] ? 0 : 1;
     }
@@ -217,27 +240,32 @@ int is_secret(char* data)
     const char s_start[] = "SECRET_START";
     const int s_start_len = strlen(s_start);
     const char s_data[] = "SECRET_DATA";
-    const int s_data_len = strlen(s_start);
+    const int s_data_len = strlen(s_data);
     const char s_end[] = "SECRET_END";
-    const int s_end_len = strlen(s_start);
+    const int s_end_len = strlen(s_end);
     const char s_repeat[] = "SECRET_REPEAT";
-    const int s_repeat_len = strlen(s_start);
+    const int s_repeat_len = strlen(s_repeat);
     const char s_accept[] = "SECRET_ACCEPT";
-    const int s_accept_len = strlen(s_start);
+    const int s_accept_len = strlen(s_accept);
 
     int corruption = string_cmp_n(data, s, s_len);
     if (corruption <= ALLOWED_CORRUPTION)
     {
         if (corruption != 0) return SECRET_CORRUPTED;
-        if (string_cmp_n(data, s_start, s_start_len)) return SECRET_START;
-        if (string_cmp_n(data, s_data, s_data_len)) return SECRET_DATA;
-        if (string_cmp_n(data, s_end, s_end_len)) return SECRET_END;
-        if (string_cmp_n(data, s_repeat, s_repeat_len)) return SECRET_REPEAT;
-        if (string_cmp_n(data, s_accept, s_accept_len)) return SECRET_ACCEPT;
+        if (!string_cmp_n(data, s_start, s_start_len)) return SECRET_START;
+        if (!string_cmp_n(data, s_data, s_data_len)) return SECRET_DATA;
+        if (!string_cmp_n(data, s_end, s_end_len)) return SECRET_END;
+        if (!string_cmp_n(data, s_repeat, s_repeat_len)) return SECRET_REPEAT;
+        if (!string_cmp_n(data, s_accept, s_accept_len)) return SECRET_ACCEPT;
         return SECRET_CORRUPTED;
     }
 
     return -1;
+}
+
+void alarm_handler(int sig)
+{
+    pcap_breakloop(handle);
 }
 
 void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
@@ -253,7 +281,7 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
   unsigned char encrypted_data[MAX_ENCRYPTED_DATA_LENGTH];
   unsigned char data[MAX_DATA_LENGTH];
   int possibly_caught = 0;
-  int secret_protocol;
+  int secret_protocol = -1;
 
   int size = header->len;
   int data_size = size;
@@ -291,8 +319,7 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
                   //TODO verify cheksum
                   //TODO decrypt
                   data_size -= SIZE_ICMPV6;
-                  strncpy((char *)data, (char *)DROP_HEADER(icmpv6hdr, SIZE_ICMPV6), data_size);
-
+                  memcpy((char *)data, (char *)DROP_HEADER(icmpv6hdr, SIZE_ICMPV6), data_size);
                   possibly_caught = 1;
               }
           }
@@ -302,7 +329,7 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
   if (possibly_caught)
   {
       secret_protocol = is_secret((char *)data);
-      if (secret_protocol > 0) //recognized a secret protocol
+      if (secret_protocol >= 0) //recognized a secret protocol
       {
           packet_was_caught = true;
           recognized_protocol = secret_protocol;
@@ -312,7 +339,7 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
               strncpy(decrypted_packet, (char *)data, data_size);
           }
 
-          //pcap_breakloop(handle);
+          pcap_breakloop(handle);
       }
   }
 }
@@ -323,7 +350,6 @@ void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
 *///========================================================================
 int listen_for_packet(bool isVerbose){
   char errbuf[PCAP_ERRBUF_SIZE];  // constant defined in pcap.h
-  pcap_t *handle;                 // packet capture handle 
   pcap_if_t *alldev, *dev ;       // a list of all input devices
   char *devname;                  // a name of the device
   struct in_addr a,b;
@@ -342,8 +368,9 @@ int listen_for_packet(bool isVerbose){
   }
   printf("\n");
 
-  devname = alldev->name;  // select the name of first interface (default) for sniffing 
-  
+  //devname = alldev->name;  // select the name of first interface (default) for sniffing
+  devname = "lo";
+
   // get IP address and mask of the sniffing interface
   if (pcap_lookupnet(devname,&netaddr,&mask,errbuf) == -1)
     err(1,"pcap_lookupnet() failed");
@@ -366,6 +393,8 @@ int listen_for_packet(bool isVerbose){
     err(1,"pcap_setfilter() failed");
 
   //TODO note, maybe it will be needed to add an alarm breakloop, just in case no packets leave computer
+  signal(SIGALRM, alarm_handler);
+  alarm(TIMEOUT);
 
   // read packets from the interface in the infinite loop (count == -1)
   // incoming packets are processed by function mypcap_handler() 

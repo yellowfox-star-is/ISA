@@ -19,9 +19,9 @@ int copy_something(char *target, char *source, int max_length)
     {
         int i;
         ptr += 1;
-        for (i = 0 ; i < max_length && source[i] != '\n' && source[i] != '\0' ; i++)
+        for (i = 0 ; i < max_length && ptr[i] != '\n' && ptr[i] != '\0' ; i++)
         {
-            target[i] = source[i];
+            target[i] = ptr[i];
         }
         for (;i < max_length; i++)
         {
@@ -47,7 +47,7 @@ int copy_length(char *source)
     char tmp[CHAR_LIMIT];
     if (strcmp(source, "SECRET_DATA\n") || strcmp(source, "SECRET_END\n"))
     {
-        if (copy_something(tmp, source, CHAR_LIMIT))
+        if (!copy_something(tmp, source, CHAR_LIMIT))
         {
             return atoi(tmp);
         }
@@ -140,8 +140,11 @@ int start_server(bool isVerbose)
                 {
                     if (recognized_protocol == SECRET_CORRUPTED)
                     {
-                        //TODO CRITICAL WARNING, the socket can be not initialized yet
-                        state = REPEAT_HEADER;
+                        //if socket was initialized, send repeat
+                        if (socket != 0) 
+                        {
+                            state = REPEAT_HEADER;
+                        }
                         break;
                     }
                     if (recognized_protocol == SECRET_START)
@@ -153,7 +156,7 @@ int start_server(bool isVerbose)
                             error_exit(1, "Couldn't resolve clients name.\n");
                         }
                         socket = initialize_socket(serverinfo);
-                        if (socket == -1)
+                        if (socket == -1) //if socket cannot be opened
                         {
                             error_exit(1, "Program wasn't able to open a socket.\n");
                         }
@@ -161,7 +164,7 @@ int start_server(bool isVerbose)
                         {
                             error_exit(1, "Filename is bigger than limit of program.\n");
                         }
-                        if (access(filename, F_OK)) //If filename already exists
+                        if (!access(filename, F_OK)) //If filename already exists
                         {
                             warning_msg("File name already exists.\n");
                             if (replace_file)
