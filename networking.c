@@ -125,7 +125,7 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *cipherte
      * IV size for *most* modes is the same as the block size. For AES this
      * is 128 bits
      */
-    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, key_128, NULL))
+    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key_128, NULL))
         return handleErrors();
 
     /*
@@ -150,6 +150,51 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *cipherte
     return ciphertext_len;
 }
 
+//encrypt taken from https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
+int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *plaintext)
+{
+    EVP_CIPHER_CTX *ctx;
+
+    int len;
+
+    int plaintext_len;
+
+    /* Create and initialise the context */
+    if(!(ctx = EVP_CIPHER_CTX_new()))
+        handleErrors();
+
+    /*
+     * Initialise the decryption operation. IMPORTANT - ensure you use a key
+     * and IV size appropriate for your cipher
+     * In this example we are using 256 bit AES (i.e. a 256 bit key). The
+     * IV size for *most* modes is the same as the block size. For AES this
+     * is 128 bits
+     */
+    if(1 != EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key_128, NULL))
+        handleErrors();
+
+    /*
+     * Provide the message to be decrypted, and obtain the plaintext output.
+     * EVP_DecryptUpdate can be called multiple times if necessary.
+     */
+    if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
+        handleErrors();
+    plaintext_len = len;
+
+    /*
+     * Finalise the decryption. Further plaintext bytes may be written at
+     * this stage.
+     */
+    if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
+        handleErrors();
+    plaintext_len += len;
+
+    /* Clean up */
+    EVP_CIPHER_CTX_free(ctx);
+
+    return plaintext_len;
+}
+
 unsigned short checksum(unsigned short *buffer, int size)
 {
 	unsigned long cksum = 0;
@@ -167,6 +212,19 @@ unsigned short checksum(unsigned short *buffer, int size)
 	cksum += (cksum >> 16);
 	return (unsigned short)(~cksum);
 }
+
+#if ICMPV6_CHECKSUM
+unsigned short checksum_v6(unsigned short *buffer, int size)
+{
+    //preparation of pseudo header
+    char pseudo_packet[MAX_PACKET_LENGTH];
+    memset(pseudo_packet, 0, MAX_PACKET_LENGTH);
+    memcpy(pseudo_packet, src_ip, sizeof(unsigned short));
+    memcpy(pseudo_packet + sizeof(unsigned short), dst_ip, sizeof(unsigned short));
+    
+    return checksum(pseudo_packet);
+}
+#endif
 
 int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data, int data_length)
 {
@@ -190,31 +248,26 @@ int send_data(int socket, const struct addrinfo *serverinfo,unsigned char *data,
         return 1;
     }
 
-    //TODO ADD ENCRYPTION
-    //TODO USE EVP?
-    //encryption
-    #if 0
+
     encrypted_data_length = encrypt(data, data_length, encrypted_data);
-    //TODO continue
     if (encrypted_data_length >= MAX_ENCRYPTED_DATA_LENGTH)
     {
         warning_msg("Implementation error. Failed during packet preparation. Encrypted data too large.\n");
         warning_msg("Please contact author.\n");
         return 1;
     }
-    #endif
 
     //packet preparation
-    memset(&packet, 0, 1500);
+    memset(&packet, 0, MAX_PACKET_LENGTH);
     struct icmphdr *icmp_header = (struct icmphdr *)packet;
-    icmp_header->type = ICMP_ECHO;
+    icmp_header->type = serverinfo->ai_family == AF_INET ? ICMP_ECHO : ICMP6_ECHO_REQUEST;
 
-    memcpy(packet + sizeof(struct icmphdr), data, data_length);
+    memcpy(packet + sizeof(struct icmphdr), encrypted_data, encrypted_data_length);
 
     //TODO ADD CHECKSUM CALCULATION
-    icmp_header->checksum = checksum((unsigned short *)icmp_header, sizeof(struct icmphdr) + data_length);
+    icmp_header->checksum = checksum((unsigned short *)icmp_header, sizeof(struct icmphdr) + encrypted_data_length);
 
-    if (sendto(socket, packet, sizeof(struct icmphdr) + data_length, 0, (struct sockaddr *)(serverinfo->ai_addr), serverinfo->ai_addrlen) < 0)
+    if (sendto(socket, packet, sizeof(struct icmphdr) + encrypted_data_length, 0, (struct sockaddr *)(serverinfo->ai_addr), serverinfo->ai_addrlen) < 0)
     {
         warning_msg("Program wasn't able to send packet.\n");
         return 1;
@@ -265,83 +318,109 @@ int is_secret(char* data)
 
 void alarm_handler(int sig)
 {
+    (void)sig;
     pcap_breakloop(handle);
 }
 
 void mypcap_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
-  struct ether_header *eptr;      // pointer to the beginning of Ethernet header
+    (void)args;
 
-  struct ip *my_ip;               // pointer to the beginning of IP header
-  struct icmphdr *icmpv4hdr;
+    struct ether_header *eptr;      // pointer to the beginning of Ethernet header
+
+    struct ip *my_ip;               // pointer to the beginning of IP header
+    struct icmphdr *icmpv4hdr;
   
-  struct ip6_hdr *my_ipv6;
-  struct icmp6_hdr *icmpv6hdr;
+    struct ip6_hdr *my_ipv6;
+    struct icmp6_hdr *icmpv6hdr;
 
-  unsigned char encrypted_data[MAX_ENCRYPTED_DATA_LENGTH];
-  unsigned char data[MAX_DATA_LENGTH];
-  int possibly_caught = 0;
-  int secret_protocol = -1;
+    unsigned char *encrypted_data;
+    unsigned char data[MAX_DATA_LENGTH];
+    int possibly_caught = 0;
+    int secret_protocol = -1;
+    unsigned short old_checksum = 0;
+    unsigned short new_checksum = 0;
+    bool corrupting = false;
 
-  int size = header->len;
-  int data_size = size;
-  eptr = (struct ether_header *) packet;
-  switch (ntohs(eptr->ether_type))
-  {
-      case ETHERTYPE_IP:
-          my_ip = (struct ip*)DROP_HEADER(packet, SIZE_ETHERNET);
-          data_size -= SIZE_ETHERNET;
-          if (my_ip->ip_p == 1) //if is ICMP
-          {
-              icmpv4hdr = (struct icmphdr*)DROP_HEADER(my_ip, SIZE_IPV4);
-              data_size -= SIZE_IPV4;
-              if (icmpv4hdr->type == ICMP_ECHO)
-              {
-                  //TODO verify checksum
-                  //TODO decrypt
-                  data_size -= SIZE_ICMP;
-                  strncpy((char *)data, (char *)DROP_HEADER(icmpv4hdr, SIZE_ICMP), data_size);
-                  
-                  possibly_caught = 1;
-              }
-          }
-      break;
+    int data_size = header->len;
+    eptr = (struct ether_header *) packet;
+    switch (ntohs(eptr->ether_type))
+    {
+        case ETHERTYPE_IP:
+            my_ip = (struct ip*)DROP_HEADER(packet, SIZE_ETHERNET);
+            data_size -= SIZE_ETHERNET;
+            if (my_ip->ip_p == 1) //if is ICMP
+            {
+                icmpv4hdr = (struct icmphdr*)DROP_HEADER(my_ip, SIZE_IPV4);
+                data_size -= SIZE_IPV4;
+                if (icmpv4hdr->type == ICMP_ECHO)
+                {
+                    //TODO verify checksum
+                    old_checksum = icmpv4hdr->checksum;
+                    icmpv4hdr->checksum = 0;
+                    new_checksum = checksum((unsigned short *)icmpv4hdr, data_size);
+                    if (old_checksum != new_checksum)
+                    {
+                        corrupting = true;  
+                    }
 
-      case ETHERTYPE_IPV6:
-          my_ipv6 = (struct ip6_hdr*)DROP_HEADER(packet, SIZE_ETHERNET);
-          data_size -= SIZE_ETHERNET;
-          if (my_ipv6->ip6_nxt == 58) //if is ICMPv6
-          {
-              icmpv6hdr = (struct icmp6_hdr*)DROP_HEADER(my_ipv6, SIZE_IPV6);
-              data_size -= SIZE_IPV6;
-              if (icmpv6hdr->icmp6_type == ICMP6_ECHO_REQUEST)
-              {
-                  //TODO verify cheksum
-                  //TODO decrypt
-                  data_size -= SIZE_ICMPV6;
-                  memcpy((char *)data, (char *)DROP_HEADER(icmpv6hdr, SIZE_ICMPV6), data_size);
-                  possibly_caught = 1;
-              }
-          }
-      break;
-  }
+                    //TODO decrypt
+                    encrypted_data = DROP_HEADER(icmpv4hdr, SIZE_ICMP);
+                    data_size -= SIZE_ICMP;
+                    data_size = decrypt(encrypted_data, data_size, data);
 
-  if (possibly_caught)
-  {
-      secret_protocol = is_secret((char *)data);
-      if (secret_protocol >= 0) //recognized a secret protocol
-      {
-          packet_was_caught = true;
-          recognized_protocol = secret_protocol;
-          strcpy(ip_src, inet_ntoa(my_ip->ip_src));
-          if (secret_protocol != SECRET_CORRUPTED)
-          {
-              strncpy(decrypted_packet, (char *)data, data_size);
-          }
+                    possibly_caught = 1;
+                }
+            }
+        break;
 
-          pcap_breakloop(handle);
-      }
-  }
+        case ETHERTYPE_IPV6:
+            my_ipv6 = (struct ip6_hdr*)DROP_HEADER(packet, SIZE_ETHERNET);
+            data_size -= SIZE_ETHERNET;
+            if (my_ipv6->ip6_nxt == 58) //if is ICMPv6
+            {
+                icmpv6hdr = (struct icmp6_hdr*)DROP_HEADER(my_ipv6, SIZE_IPV6);
+                data_size -= SIZE_IPV6;
+                if (icmpv6hdr->icmp6_type == ICMP6_ECHO_REQUEST)
+                {
+                    #if ICMPV6_CHECKSUM
+                    old_checksum = icmpv6hdr->icmp6_cksum;
+                    icmpv6hdr->icmp6_cksum = 0;
+                    new_checksum = checksum((unsigned short *)icmpv6hdr, data_size);
+                    if (old_checksum != new_checksum)
+                    {
+                        corrupting = true;
+                    }
+                    #endif
+
+                    //TODO decrypt
+                    encrypted_data = DROP_HEADER(icmpv6hdr, SIZE_ICMPV6);
+                    data_size -= SIZE_ICMPV6;
+                    data_size = decrypt(encrypted_data, data_size, data);
+
+                    possibly_caught = 1;
+                }
+            }
+        break;
+    }
+
+    if (possibly_caught)
+    {
+        secret_protocol = is_secret((char *)data);
+        if (secret_protocol >= 0) //recognized a secret protocol
+        {
+            packet_was_caught = true;
+            recognized_protocol = corrupting ? SECRET_CORRUPTED : secret_protocol;
+            strcpy(ip_src, ntohs(eptr->ether_type) == ETHERTYPE_IP ? inet_ntoa(my_ip->ip_src) : inet_ntop(AF_INET6, &my_ipv6->ip6_src, ip_src, INET6_ADDRSTRLEN));
+            //strcpy(ip_src, inet_ntoa(ntohs(eptr->ether_type) == ETHERTYPE_IP ? my_ip->ip_src : my_ipv6->ip6_src));
+            if (secret_protocol != SECRET_CORRUPTED)
+            {
+                memcpy(decrypted_packet, (char *)data, data_size);
+            }
+
+            pcap_breakloop(handle);
+        }
+    }
 }
 
 /*==========================================================================
@@ -352,7 +431,6 @@ int listen_for_packet(bool isVerbose){
   char errbuf[PCAP_ERRBUF_SIZE];  // constant defined in pcap.h
   pcap_if_t *alldev, *dev ;       // a list of all input devices
   char *devname;                  // a name of the device
-  struct in_addr a,b;
   bpf_u_int32 netaddr;            // network address configured at the input device
   bpf_u_int32 mask;               // network mask of the input device
   struct bpf_program fp;          // the compiled filter
@@ -375,10 +453,13 @@ int listen_for_packet(bool isVerbose){
   if (pcap_lookupnet(devname,&netaddr,&mask,errbuf) == -1)
     err(1,"pcap_lookupnet() failed");
 
+  #if 0
+  struct in_addr a,b;
   a.s_addr=netaddr;
-  printf("Opening interface \"%s\" with net address %s,",devname,inet_ntoa(a));
+  //printf("Opening interface \"%s\" with net address %s,",devname,inet_ntoa(a));
   b.s_addr=mask;
-  printf("mask %s for listening...\n",inet_ntoa(b));
+  //printf("mask %s for listening...\n",inet_ntoa(b));
+  #endif
 
   // open the interface for live sniffing
   if ((handle = pcap_open_live(devname,BUFSIZ,1,1000,errbuf)) == NULL)

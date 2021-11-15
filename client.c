@@ -56,9 +56,15 @@ int start_client(char *filename, char *hostname, bool isVerbose)
     unsigned char buffer[MAX_DATA_LENGTH];
     unsigned char data[MAX_DATA_LENGTH];
     int data_length = 0;
+    int soft_strikes = 0;
+    int hard_strikes = 0;
 
     while (state != EXIT)
     {
+        if (cancel_received)
+        {
+            state = FREE;
+        }
         switch (state)
         {
             case START:
@@ -80,7 +86,7 @@ int start_client(char *filename, char *hostname, bool isVerbose)
 
             case SEND_HEADER:
                 //TODO CRITICAL send only filename and not path
-                data_length += snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_START\n%s\n", filename);
+                data_length = snprintf((char *)data, MAX_DATA_LENGTH, "SECRET_START\n%s\n", filename);
                 send_data(socket, serverinfo, data, data_length);
                 state = WAIT_FOR_HEADER;
             break;
@@ -94,16 +100,49 @@ int start_client(char *filename, char *hostname, bool isVerbose)
                     if (recognized_protocol == SECRET_REPEAT)
                     {
                         //if repeat is received, function will fall through and return to repeat state
+                        soft_strikes--;
                     }
                     else if (recognized_protocol == SECRET_ACCEPT)
                     {
+                        soft_strikes = 0;
+                        hard_strikes = 0;
                         data_length = 0;
-                        state = state == END ? EXIT : SEND_DATA;
+                        if (hard_strikes >= STRIKE_LIMIT)
+                        {
+                            warning_msg("Server resumed communication.\n");
+                        }
+                        state = state == WAIT_FOR_FINISH ? FREE : SEND_DATA;
+                        break;
                     }
                 }
                 if (state == WAIT_FOR_HEADER) state = SEND_HEADER;
                 if (state == WAIT_FOR_ACCEPT) state = REPEAT_DATA;
                 if (state == WAIT_FOR_FINISH) state = REPEAT_END;
+                soft_strikes++;
+                hard_strikes++;
+                if (hard_strikes == STRIKE_LIMIT)
+                {
+                    hard_strikes++;
+                    if (soft_strikes == STRIKE_LIMIT)
+                    {
+                        warning_msg("Program is stuck on repeating messages.\n");
+                    }
+                    else
+                    {
+                        if (state == WAIT_FOR_FINISH)
+                        {
+                            warning_msg("Program didn't recieve confirmation of recieving of file, but all data were sent.\n");
+                            warning_msg("Data were probably send and the program will close itself.\n");
+                        }
+                        else
+                        {
+                            warning_msg("Server stopped to communicate.\n");
+                        }
+                    }
+                }
+                else if (hard_strikes < STRIKE_LIMIT)
+                {
+                }
             break;
 
             case SEND_DATA:

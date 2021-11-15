@@ -132,6 +132,10 @@ int start_server(bool isVerbose)
 
     while (state != EXIT)
     {
+        if (cancel_received)
+        {
+            state = CANCEL;
+        }
         switch (state)
         {
             case WAIT_FOR_HEADER:
@@ -196,20 +200,6 @@ int start_server(bool isVerbose)
                 }
             break;
 
-            case REPEAT_HEADER:
-                out_data_length = snprintf((char *)out_data, MAX_DATA_LENGTH, "SECRET_REPEAT\n");
-                send_data(socket, serverinfo, out_data, out_data_length);
-                state = WAIT_FOR_HEADER;
-                break;
-            break;
-
-            case ACCEPT_HEADER:
-                out_data_length = snprintf((char *)out_data, MAX_DATA_LENGTH, "SECRET_ACCEPT\n");
-                send_data(socket, serverinfo, out_data, out_data_length);
-                state = WAIT_FOR_DATA;
-                break;
-            break;
-
             case WAIT_FOR_DATA:
                 listen_for_packet(isVerbose);
                 if (packet_was_caught && !strcmp(clientname, ip_src))
@@ -263,6 +253,20 @@ int start_server(bool isVerbose)
                         break;
                     }
                 }
+            break;
+
+            case REPEAT_HEADER:
+                out_data_length = snprintf((char *)out_data, MAX_DATA_LENGTH, "SECRET_REPEAT\n");
+                send_data(socket, serverinfo, out_data, out_data_length);
+                state = WAIT_FOR_HEADER;
+                break;
+            break;
+
+            case ACCEPT_HEADER:
+                out_data_length = snprintf((char *)out_data, MAX_DATA_LENGTH, "SECRET_ACCEPT\n");
+                send_data(socket, serverinfo, out_data, out_data_length);
+                state = WAIT_FOR_DATA;
+                break;
             break;
 
             case REPEAT_DATA:

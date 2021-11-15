@@ -15,6 +15,10 @@ enum secret_protocol {SECRET_START, SECRET_DATA, SECRET_END, SECRET_ACCEPT, SECR
 #define ALLOWED_CORRUPTION 2
 #define TIMEOUT (5)
 extern bool replace_file;
+extern bool cancel_received;
+#define STRIKE_LIMIT (20)
+
+#define ICMPV6_CHECKSUM 0
 
 #endif //SMRCKA_BAT_H
 
