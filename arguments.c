@@ -1,3 +1,12 @@
+//author: Václav Sysel
+//VUT FIT, 5. semestr
+//ISA, projekt
+//varianta: skrytý kanál
+//
+//feel free to use, but if you are a student of VUT FIT, please no plagiarism *wink wink*
+//my style of coding is fairly specific and I have no doubt, that you could be found out for it
+//so... let be inspired but no steal steal <3
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,10 +21,22 @@
 #include "arguments.h"
 #include "smrcka_bat.h"
 
+/*
+Parses arguments using getopt and returns variables in pointers.
+*/
 int read_arguments(int argc, char* argv[], char **filename, char **hostname, bool *isServer, bool *isVerbose)
 {
+    /*
+    Opterr is saved and returned on the end of the function.
+    */
     int original_opterr = opterr;
     opterr = 0;
+
+    //initialization of variables
+    *filename = NULL;
+    *hostname = NULL;
+    *isServer = false;
+    *isVerbose = false;
 
     int result = 0;
     int c;
@@ -52,7 +73,7 @@ int read_arguments(int argc, char* argv[], char **filename, char **hostname, boo
                 result = 1;
                 break;
             default:
-                error_exit(1, "Crittical error happened during argument parsing.\n");
+                error_exit(1, "Critical error happened during argument parsing.\n");
                 continue;
         }
 
@@ -62,10 +83,14 @@ int read_arguments(int argc, char* argv[], char **filename, char **hostname, boo
 
 int verify_filename(char *filename, bool isVerbose);
 int verify_hostname(char *hostname, bool isVerbose);
+/*
+ * Verifies, if passed arguments are usable for a program. Exits the program if arguments are unusable.
+ */
 int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer, bool isVerbose)
 {
     int result = 0;
 
+    //No arguments were recognized so the program prints basic help and ends.
     if (filename == NULL && hostname == NULL && isServer == false)
     {
         printf("Usage:\n");
@@ -78,8 +103,8 @@ int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer
 
     if (isVerbose)
     {
-        printf("The program was started in a verbose mode. Prepare, that it will be unnecesarily chatty.\n");
-        printf("Recieved arguments:\n");
+        printf("The program was started in a verbose mode. Prepare, that it will be unnecessarily chatty.\n");
+        printf("Received arguments:\n");
         printf("%sfilename: %s\n",indent, filename);
         printf("%shostname: %s\n",indent, hostname);
         printf("%sisServer: %s\n",indent, BOOL2STRING(isServer));
@@ -95,7 +120,7 @@ int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer
             if (hostname != NULL) BIT_SET(state, 1);
             if (state)
             {
-                printf("Recieved unnecesary arguments:\n");
+                printf("Received unnecessary arguments:\n");
                 if (BIT_GET(state, 0)) printf("    filename: %s\n", filename);
                 if (BIT_GET(state, 1)) printf("    ip|hostname: %s\n", hostname);
                 printf("These arguments won't be used and checked, as they are not needed for server mode.\n");
@@ -105,29 +130,36 @@ int verify_arguments(char* argv[], char *filename, char *hostname, bool isServer
     }
     else //isClient
     {
+        /*
+         * Results of verifying functions are saved via OR assignment.
+         * If normal assignment was to be used, verify_filename is technically never used,
+         * because checking of hostname would always replace the result and higher optimization could skip
+         * verify_filename, but it must be run, because it writes information for user during checkup.
+         */
         if (filename != NULL) //file verification
         {
-            result = verify_filename(filename, isVerbose);
+            result |= verify_filename(filename, isVerbose);
         }
         else
         {
-            warning_msg("File argument not recieved.\n");
-            result = 1;
+            warning_msg("File argument not received.\n");
+            result |= 1;
         }
 
         if (hostname != NULL) //hostname verification
         {
-            result = verify_hostname(hostname, isVerbose);
+            result |= verify_hostname(hostname, isVerbose);
         }
         else
         {
-            warning_msg("Hostname argument not recieved.\n");
-            result = 1;
+            warning_msg("Hostname argument not received.\n");
+            result |= 1;
         }
     }
 
     if (result)
     {
+        //If any of the arguments aren't usable, program cannot start and thus the program will end itself.
         error_exit(result, "Program wasn't able to use passed arguments.\n");
     }
 
@@ -138,7 +170,7 @@ int verify_filename(char *filename, bool isVerbose)
 {
     int result = 0;
 
-    if (access(filename, F_OK)) //checks if file exists
+    if (access(filename, F_OK))
     {
         warning_msg("File \"%s\" doesn't exists.\n", filename);
         result = 1;
@@ -149,7 +181,7 @@ int verify_filename(char *filename, bool isVerbose)
         {
             printf("File \"%s\" exists.\n", filename);
         }
-        if (access(filename, R_OK)) //checks if it is readable
+        if (access(filename, R_OK))
         {
             warning_msg("File \"%s\" cannot be accessed for reading.\n", filename);
             result = 1;

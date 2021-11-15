@@ -2,24 +2,33 @@
 //VUT FIT, 5. semestr
 //ISA, projekt
 //varianta: skrytý kanál
+//
+//feel free to use, but if you are a student of VUT FIT, please no plagiarism *wink wink*
+//my style of coding is fairly specific and I have no doubt, that you could be found out for it
+//so... let be inspired but no steal steal <3
 
 //POSIX headers
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <signal.h>
-#include <unistd.h>
 
 //custom headers
 #include "error.h"
-#include "bit.h"
 #include "arguments.h"
 #include "smrcka_bat.h"
 
+//two sides of the program
+//each "mode" of the program is separated into separate module
 #include "client.h"
 #include "server.h"
 
+/*
+Handler for that is called when user presses CTRL-C.
+Function notifies user, because it can take a moment before server/client module timeouts.
+Handler sets cancel_received to true, server and client module check for this variable
+and appropriately shut down.
+*/
 void intHandler(int dummy)
 {
     (void)dummy;
@@ -42,11 +51,11 @@ int main (int argc, char* argv[])
 
     if (isServer)
     {
-        start_server(isVerbose);
+        return start_server(isVerbose);
     }
     else
     {
-        start_client(filename, hostname, isVerbose);
+        return start_client(filename, hostname, isVerbose);
     }
 
     return 0;
